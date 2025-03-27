@@ -1,4 +1,4 @@
-# 🧑‍💼 Audit Sampling Tool
+# Audit Sampling Tool
 
 This interactive Python + Streamlit tool allows auditors and compliance testers to:
 
