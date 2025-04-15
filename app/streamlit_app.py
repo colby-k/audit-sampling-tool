@@ -11,14 +11,6 @@ st.sidebar.header("📁 Upload File")
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
 
 # Utilities
-def auto_detect_monetary_column(df):
-    numeric_cols = df.select_dtypes(include='number').columns.tolist()
-    keywords = ['amount', 'total', 'value', 'payment', 'invoice', 'price', 'cost', 'fee']
-    for col in numeric_cols:
-        if any(k in col.lower() for k in keywords):
-            return col
-    return numeric_cols[0] if numeric_cols else None
-
 def determine_sample_size(n):
     if n <= 50:
         return n
@@ -101,16 +93,36 @@ if uploaded_file:
             suggested = determine_sample_size(len(filtered_df))
             n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
 
+            # MUS: Require amount column selection
+            amount_col = None
+            if method == "Monetary Unit Sampling":
+                numeric_cols = filtered_df.select_dtypes(include='number').columns.tolist()
+                if numeric_cols:
+                    amount_col = st.selectbox("💰 Select Amount Field for MUS", numeric_cols)
+                else:
+                    st.warning("⚠️ No numeric columns available for Monetary Unit Sampling.")
+
             if st.button("🎯 Run Sample"):
                 if method == "Random":
                     sample_df = filtered_df.sample(n=n)
-                else:
-                    col = auto_detect_monetary_column(filtered_df)
-                    weights = filtered_df[col]
-                    probs = weights / weights.sum()
-                    sample_df = filtered_df.sample(n=n, weights=probs)
-                    st.info(f"💰 Using column: '{col}' for weighting")
-                st.success(f"✅ Sample complete: {len(sample_df)} rows")
+                    st.success(f"✅ Random sample complete: {len(sample_df)} rows")
+
+                elif method == "Monetary Unit Sampling":
+                    if amount_col:
+                        try:
+                            weights = filtered_df[amount_col].abs()
+                            total_weight = weights.sum()
+
+                            if total_weight == 0:
+                                st.error("❌ All weights are zero. Cannot perform Monetary Unit Sampling.")
+                            else:
+                                probs = weights / total_weight
+                                sample_df = filtered_df.sample(n=n, weights=probs)
+                                st.success(f"✅ MUS sample complete: {len(sample_df)} rows")
+                        except Exception as e:
+                            st.error(f"❌ Error in MUS sampling: {e}")
+                    else:
+                        st.error("❌ Please select a valid amount field.")
 
         # Step 4: Export
         if not sample_df.empty:
