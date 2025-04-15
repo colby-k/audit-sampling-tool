@@ -1,44 +1,14 @@
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-from io import BytesIO
-from datetime import datetime
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-
-st.set_page_config(page_title="Audit Sampling Tool", layout="wide")
-st.title("Audit Sampling Tool")
-
-st.sidebar.header("📁 Upload File")
-uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
-
-# Utilities
-def determine_sample_size(n):
-    if n <= 50:
-        return n
-    elif n <= 250:
-        return 25
-    elif n <= 500:
-        return 40
-    else:
-        return 60
-
-def statistical_sample_size(N, confidence=0.95, margin_of_error=0.05, p=0.5):
-    z = norm.ppf(1 - (1 - confidence) / 2)
-    n_0 = (z**2 * p * (1 - p)) / margin_of_error**2
-    n = n_0 / (1 + ((n_0 - 1) / N))  # finite population correction
-    return int(np.ceil(n))
-
 if uploaded_file:
     try:
         filename = uploaded_file.name
         if filename.endswith(".csv"):
             df = pd.read_csv(uploaded_file)
-    except Exception as e:
-        st.error(f"❌ Failed to load/process file: {e}")
         else:
             df = pd.read_excel(uploaded_file)
+    except Exception as e:
+        st.error(f"❌ Failed to load/process file: {e}")
+
 
         df = df.copy()
         for col in df.select_dtypes(include='object').columns:
@@ -58,7 +28,6 @@ if uploaded_file:
                 if min_val == max_val:
                     st.sidebar.info(f"ℹ️ '{col}' has constant value: {min_val}")
                     filters[col] = df[col] == min_val
-                else:
                     selected_range = st.sidebar.slider(f"{col} range", min_val, max_val, (min_val, max_val))
                     filters[col] = df[col].between(*selected_range)
 
@@ -68,7 +37,6 @@ if uploaded_file:
                 if isinstance(selected, tuple):
                     filters[col] = df[col].between(pd.to_datetime(selected[0]), pd.to_datetime(selected[1]))
 
-            else:
                 unique = df[col].dropna().unique().tolist()
                 selected = st.sidebar.multiselect(f"{col}", unique)
                 if selected:
@@ -108,7 +76,6 @@ if uploaded_file:
                 st.markdown(f"**📋 Sample Summary:** {n} items selected from {len(filtered_df)} records after filtering.")
                 st.success(f"✅ Statistical sample complete: {len(sample_df)} rows")
 
-        else:
             suggested = determine_sample_size(len(filtered_df))
             n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
 
@@ -117,7 +84,6 @@ if uploaded_file:
                 numeric_cols = filtered_df.select_dtypes(include='number').columns.tolist()
                 if numeric_cols:
                     amount_col = st.selectbox("💰 Select Amount Field for MUS", numeric_cols)
-                else:
                     st.warning("⚠️ No numeric columns available for Monetary Unit Sampling.")
 
             if st.button("🎯 Run Sample"):
@@ -134,14 +100,12 @@ if uploaded_file:
                                 st.error("❌ All weights are zero. Cannot perform Monetary Unit Sampling.")
     except Exception as e:
         st.error(f"❌ Failed to load/process file: {e}")
-                            else:
                                 probs = weights / total_weight
                                 sample_df = filtered_df.sample(n=n, weights=probs)
                                 st.markdown(f"**📋 Sample Summary:** {n} items selected from {len(filtered_df)} records after filtering.")
                                 st.success(f"✅ MUS sample complete: {len(sample_df)} rows")
                     
         # Show AICPA guide above method selector
-else:
     st.info("📂 Upload a CSV or Excel file to begin.")
 
 
