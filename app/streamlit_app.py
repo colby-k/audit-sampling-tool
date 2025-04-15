@@ -29,6 +29,14 @@ def determine_sample_size(n):
     else:
         return 60
 
+def calculate_statistical_sample_size(confidence_level: str, precision_pct: float, expected_error_pct: float) -> int:
+    z_scores = {"90%": 1.645, "95%": 1.960, "99%": 2.576}
+    Z = z_scores[confidence_level]
+    p = expected_error_pct / 100.0
+    E = precision_pct / 100.0
+    n = (Z ** 2) * p * (1 - p) / (E ** 2)
+    return int(np.ceil(n))
+
 # Step 1: Upload + Clean
 if uploaded_file:
     try:
@@ -49,8 +57,7 @@ if uploaded_file:
         filters = {}
         for col in df.columns:
             if df[col].dropna().empty:
-                continue  # skip empty columns
-
+                continue
             if np.issubdtype(df[col].dtype, np.number):
                 min_val, max_val = float(df[col].min()), float(df[col].max())
                 if min_val == max_val:
@@ -59,13 +66,11 @@ if uploaded_file:
                 else:
                     selected_range = st.sidebar.slider(f"{col} range", min_val, max_val, (min_val, max_val))
                     filters[col] = df[col].between(*selected_range)
-
             elif np.issubdtype(df[col].dtype, np.datetime64):
                 min_date, max_date = df[col].min(), df[col].max()
                 selected = st.sidebar.date_input(f"{col} range", (min_date, max_date))
                 if isinstance(selected, tuple):
                     filters[col] = df[col].between(pd.to_datetime(selected[0]), pd.to_datetime(selected[1]))
-
             else:
                 unique = df[col].dropna().unique().tolist()
                 selected = st.sidebar.multiselect(f"{col}", unique)
@@ -83,7 +88,7 @@ if uploaded_file:
 
         # Step 3: Sampling
         st.subheader("🎲 Select Sampling Method")
-        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified"])
+        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
         sample_df = pd.DataFrame()
 
         if method == "Stratified":
@@ -97,11 +102,34 @@ if uploaded_file:
                     sample_df = pd.concat([sample_df, group_df.sample(n=n)])
                 st.success(f"✅ Stratified sample complete: {len(sample_df)} rows")
 
+        elif method == "Statistical (Attribute or Monetary)":
+            sample_type = st.selectbox("Sampling Type", ["Attribute", "Monetary"])
+            confidence_level = st.selectbox("Confidence Level", ["90%", "95%", "99%"])
+            precision = st.number_input("Precision (% Tolerable Deviation)", min_value=0.1, max_value=20.0, value=5.0)
+            expected_error = st.number_input("Expected Error Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
+
+            if st.button("🌿 Run Statistical Sample"):
+                n = calculate_statistical_sample_size(confidence_level, precision, expected_error)
+                n = min(n, len(filtered_df))
+
+                if sample_type == "Attribute":
+                    sample_df = filtered_df.sample(n=n)
+                else:
+                    col = auto_detect_monetary_column(filtered_df)
+                    if col:
+                        weights = filtered_df[col]
+                        probs = weights / weights.sum()
+                        sample_df = filtered_df.sample(n=n, weights=probs)
+                        st.info(f"💰 Using column: '{col}' for weighting")
+                    else:
+                        st.warning("⚠️ No monetary column detected. Defaulting to random sampling.")
+                        sample_df = filtered_df.sample(n=n)
+                st.success(f"✅ Statistical sample complete: {len(sample_df)} rows")
+
         else:
             suggested = determine_sample_size(len(filtered_df))
             n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
-
-            if st.button("🎯 Run Sample"):
+            if st.button("🌯 Run Sample"):
                 if method == "Random":
                     sample_df = filtered_df.sample(n=n)
                 else:
@@ -112,9 +140,14 @@ if uploaded_file:
                     st.info(f"💰 Using column: '{col}' for weighting")
                 st.success(f"✅ Sample complete: {len(sample_df)} rows")
 
+        # Summary
+        if not sample_df.empty:
+            st.subheader("📊 Sample Summary")
+            st.info(f"Selected {len(sample_df)} items from population of {len(filtered_df)}.")
+
         # Step 4: Export
         if not sample_df.empty:
-            st.subheader("💾 Export Sample + Audit Log")
+            st.subheader("📂 Export Sample + Audit Log")
 
             def export_to_excel(sample_df, filters):
                 output = BytesIO()
@@ -131,8 +164,7 @@ if uploaded_file:
                 return output.getvalue()
 
             excel_data = export_to_excel(sample_df, filters)
-            st.download_button("📥 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
-
+            st.download_button("📅 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
             st.dataframe(sample_df)
 
     except Exception as e:
