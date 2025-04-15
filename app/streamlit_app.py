@@ -35,6 +35,8 @@ if uploaded_file:
         filename = uploaded_file.name
         if filename.endswith(".csv"):
             df = pd.read_csv(uploaded_file)
+    except Exception as e:
+        st.error(f"❌ Failed to load/process file: {e}")
         else:
             df = pd.read_excel(uploaded_file)
 
@@ -130,6 +132,8 @@ if uploaded_file:
                             total_weight = weights.sum()
                             if total_weight == 0:
                                 st.error("❌ All weights are zero. Cannot perform Monetary Unit Sampling.")
+    except Exception as e:
+        st.error(f"❌ Failed to load/process file: {e}")
                             else:
                                 probs = weights / total_weight
                                 sample_df = filtered_df.sample(n=n, weights=probs)
