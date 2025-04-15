@@ -94,6 +94,7 @@ if uploaded_file:
                     group_df = filtered_df[filtered_df[strat_col] == group]
                     n = min(n_per_group, len(group_df))
                     sample_df = pd.concat([sample_df, group_df.sample(n=n)])
+                st.markdown(f"**📋 Sample Summary:** {len(sample_df)} total rows selected across all groups.")
                 st.success(f"✅ Stratified sample complete: {len(sample_df)} rows")
 
         elif method == "Statistical":
@@ -103,6 +104,7 @@ if uploaded_file:
             st.info(f"🔢 Calculated statistical sample size: {n} rows")
             if st.button("📊 Run Statistical Sample"):
                 sample_df = filtered_df.sample(n=min(n, len(filtered_df)))
+                st.markdown(f"**📋 Sample Summary:** {n} items selected from {len(filtered_df)} records after filtering.")
                 st.success(f"✅ Statistical sample complete: {len(sample_df)} rows")
 
         else:
@@ -117,9 +119,31 @@ if uploaded_file:
                 else:
                     st.warning("⚠️ No numeric columns available for Monetary Unit Sampling.")
 
+            # Optional: AICPA sample reference shown before button
+            if st.checkbox("📖 Show AICPA sample size guide"):
+                aicpa_table = pd.DataFrame({
+                    "Population Size": ["0–50", "51–250", "251–500", "500+"],
+                    "Suggested Sample Size": ["All", "25", "40", "60"]
+                })
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("📘 AICPA Table")
+                    st.table(aicpa_table)
+                with col2:
+                    st.subheader("📈 Chart")
+                    x = [25, 100, 300, 1000]
+                    y = [25, 25, 40, 60]
+                    fig, ax = plt.subplots()
+                    ax.plot(x, y, marker='o')
+                    ax.set_xlabel("Population Size")
+                    ax.set_ylabel("Sample Size")
+                    ax.set_title("AICPA-Inspired Fixed Sample Sizes")
+                    st.pyplot(fig)
+
             if st.button("🎯 Run Sample"):
                 if method == "Random":
                     sample_df = filtered_df.sample(n=n)
+                    st.markdown(f"**📋 Sample Summary:** {n} items selected from {len(filtered_df)} records after filtering.")
                     st.success(f"✅ Random sample complete: {len(sample_df)} rows")
                 elif method == "Monetary Unit Sampling":
                     if amount_col:
@@ -131,6 +155,7 @@ if uploaded_file:
                             else:
                                 probs = weights / total_weight
                                 sample_df = filtered_df.sample(n=n, weights=probs)
+                                st.markdown(f"**📋 Sample Summary:** {n} items selected from {len(filtered_df)} records after filtering.")
                                 st.success(f"✅ MUS sample complete: {len(sample_df)} rows")
                         except Exception as e:
                             st.error(f"❌ Error in MUS sampling: {e}")
