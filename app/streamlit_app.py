@@ -1,8 +1,11 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
 from datetime import datetime
+import matplotlib.pyplot as plt
+from scipy.stats import norm
 
 st.set_page_config(page_title="Audit Sampling Tool", layout="wide")
 st.title("Audit Sampling Tool")
@@ -20,6 +23,12 @@ def determine_sample_size(n):
         return 40
     else:
         return 60
+
+def statistical_sample_size(N, confidence=0.95, margin_of_error=0.05, p=0.5):
+    z = norm.ppf(1 - (1 - confidence) / 2)
+    n_0 = (z**2 * p * (1 - p)) / margin_of_error**2
+    n = n_0 / (1 + ((n_0 - 1) / N))  # finite population correction
+    return int(np.ceil(n))
 
 # Step 1: Upload + Clean
 if uploaded_file:
@@ -75,7 +84,7 @@ if uploaded_file:
 
         # Step 3: Sampling
         st.subheader("🎲 Select Sampling Method")
-        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified"])
+        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical"])
         sample_df = pd.DataFrame()
 
         if method == "Stratified":
@@ -88,6 +97,15 @@ if uploaded_file:
                     n = min(n_per_group, len(group_df))
                     sample_df = pd.concat([sample_df, group_df.sample(n=n)])
                 st.success(f"✅ Stratified sample complete: {len(sample_df)} rows")
+
+        elif method == "Statistical":
+            confidence = st.selectbox("Confidence Level", [0.90, 0.95, 0.99], index=1)
+            margin = st.slider("Margin of Error (%)", min_value=1, max_value=10, value=5) / 100
+            n = statistical_sample_size(len(filtered_df), confidence=confidence, margin_of_error=margin)
+            st.info(f"🔢 Calculated statistical sample size: {n} rows")
+            if st.button("📊 Run Statistical Sample"):
+                sample_df = filtered_df.sample(n=min(n, len(filtered_df)))
+                st.success(f"✅ Statistical sample complete: {len(sample_df)} rows")
 
         else:
             suggested = determine_sample_size(len(filtered_df))
@@ -124,30 +142,13 @@ if uploaded_file:
                     else:
                         st.error("❌ Please select a valid amount field.")
 
-        # Step 4: Export
-        if not sample_df.empty:
-            st.subheader("💾 Export Sample + Audit Log")
-
-            def export_to_excel(sample_df, filters):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    sample_df.to_excel(writer, sheet_name="Sample", index=False)
-                    audit_log = {
-                        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "Rows in Population": len(df),
-                        "Rows After Filter": len(filtered_df),
-                        "Sample Size": len(sample_df),
-                        "Filters Applied": str({k: str(v) for k, v in filters.items()})
-                    }
-                    pd.DataFrame.from_dict(audit_log, orient='index').to_excel(writer, sheet_name="AuditLog")
-                return output.getvalue()
-
-            excel_data = export_to_excel(sample_df, filters)
-            st.download_button("📥 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
-
-            st.dataframe(sample_df)
-
-    except Exception as e:
-        st.error(f"❌ Failed to load/process file: {e}")
-else:
-    st.info("📂 Upload a CSV or Excel file to begin.")
+        # Optional: AICPA sample reference
+        if st.checkbox("📖 Show AICPA sample size guide"):
+            aicpa_table = pd.DataFrame({
+                "Population Size": ["0–50", "51–250", "251–500", "500+"],
+                "Suggested Sample Size": ["All", "25", "40", "60"]
+            })
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("📘 AICPA Table")
+                st.table(aicpa_table)
