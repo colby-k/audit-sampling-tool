@@ -213,3 +213,27 @@ if uploaded_file:
 
 else:
     st.info("📂 Upload a CSV or Excel file to begin.")
+
+
+
+    # Show AICPA guide at end of app
+    if st.checkbox("📖 Show AICPA sample size guide", key="aicpa_end_section"):
+        aicpa_table = pd.DataFrame({
+            "Population Size": ["0–50", "51–250", "251–500", "500+"],
+            "Suggested Sample Size": ["All", "25", "40", "60"]
+        })
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("📘 AICPA Table")
+            st.table(aicpa_table)
+        with col2:
+            st.subheader("📈 Chart")
+            x = [25, 100, 300, 1000]
+            y = [25, 25, 40, 60]
+            fig, ax = plt.subplots()
+            ax.plot(x, y, marker='o')
+            ax.set_xlabel("Population Size")
+            ax.set_ylabel("Sample Size")
+            ax.set_title("AICPA-Inspired Fixed Sample Sizes")
+            st.pyplot(fig)
+
