@@ -129,7 +129,7 @@ if uploaded_file:
         else:
             suggested = determine_sample_size(len(filtered_df))
             n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
-            if st.button("🌯 Run Sample"):
+            if st.button("🎯 Run Sample"):
                 if method == "Random":
                     sample_df = filtered_df.sample(n=n)
                 else:
