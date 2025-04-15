@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -29,7 +30,6 @@ def statistical_sample_size(N, confidence=0.95, margin_of_error=0.05, p=0.5):
     n = n_0 / (1 + ((n_0 - 1) / N))  # finite population correction
     return int(np.ceil(n))
 
-# Step 1: Upload + Clean
 if uploaded_file:
     try:
         filename = uploaded_file.name
@@ -49,7 +49,7 @@ if uploaded_file:
         filters = {}
         for col in df.columns:
             if df[col].dropna().empty:
-                continue  # skip empty columns
+                continue
 
             if np.issubdtype(df[col].dtype, np.number):
                 min_val, max_val = float(df[col].min()), float(df[col].max())
@@ -72,7 +72,6 @@ if uploaded_file:
                 if selected:
                     filters[col] = df[col].isin(selected)
 
-        # Apply filters
         filtered_df = df
         for key, cond in filters.items():
             filtered_df = filtered_df[cond]
@@ -110,7 +109,6 @@ if uploaded_file:
             suggested = determine_sample_size(len(filtered_df))
             n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
 
-            # MUS: Require amount column selection
             amount_col = None
             if method == "Monetary Unit Sampling":
                 numeric_cols = filtered_df.select_dtypes(include='number').columns.tolist()
@@ -123,13 +121,11 @@ if uploaded_file:
                 if method == "Random":
                     sample_df = filtered_df.sample(n=n)
                     st.success(f"✅ Random sample complete: {len(sample_df)} rows")
-
                 elif method == "Monetary Unit Sampling":
                     if amount_col:
                         try:
                             weights = filtered_df[amount_col].abs()
                             total_weight = weights.sum()
-
                             if total_weight == 0:
                                 st.error("❌ All weights are zero. Cannot perform Monetary Unit Sampling.")
                             else:
@@ -141,13 +137,51 @@ if uploaded_file:
                     else:
                         st.error("❌ Please select a valid amount field.")
 
-        # Optional: AICPA sample reference
-        if st.checkbox("📖 Show AICPA sample size guide"):
-            aicpa_table = pd.DataFrame({
-                "Population Size": ["0–50", "51–250", "251–500", "500+"],
-                "Suggested Sample Size": ["All", "25", "40", "60"]
-            })
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("📘 AICPA Table")
-                st.table(aicpa_table)
+        # Step 4: Export
+        if not sample_df.empty:
+            st.subheader("💾 Export Sample + Audit Log")
+
+            def export_to_excel(sample_df, filters):
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    sample_df.to_excel(writer, sheet_name="Sample", index=False)
+                    audit_log = {
+                        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Rows in Population": len(df),
+                        "Rows After Filter": len(filtered_df),
+                        "Sample Size": len(sample_df),
+                        "Filters Applied": str({k: str(v) for k, v in filters.items()})
+                    }
+                    pd.DataFrame.from_dict(audit_log, orient='index').to_excel(writer, sheet_name="AuditLog")
+                return output.getvalue()
+
+            excel_data = export_to_excel(sample_df, filters)
+            st.download_button("📥 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
+            st.dataframe(sample_df)
+
+    except Exception as e:
+        st.error(f"❌ Failed to load/process file: {e}")
+
+    # ✅ Now that try is closed, show optional chart/table
+    if st.checkbox("📖 Show AICPA sample size guide"):
+        aicpa_table = pd.DataFrame({
+            "Population Size": ["0–50", "51–250", "251–500", "500+"],
+            "Suggested Sample Size": ["All", "25", "40", "60"]
+        })
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("📘 AICPA Table")
+            st.table(aicpa_table)
+        with col2:
+            st.subheader("📈 Chart")
+            x = [25, 100, 300, 1000]
+            y = [25, 25, 40, 60]
+            fig, ax = plt.subplots()
+            ax.plot(x, y, marker='o')
+            ax.set_xlabel("Population Size")
+            ax.set_ylabel("Sample Size")
+            ax.set_title("AICPA-Inspired Fixed Sample Sizes")
+            st.pyplot(fig)
+
+else:
+    st.info("📂 Upload a CSV or Excel file to begin.")
