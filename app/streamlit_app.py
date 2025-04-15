@@ -115,7 +115,9 @@ if uploaded_file:
                 if sample_type == "Attribute":
                     sample_df = filtered_df.sample(n=n)
                 else:
-                    col = auto_detect_monetary_column(filtered_df)
+                    monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
+                    default_col = auto_detect_monetary_column(filtered_df)
+                    col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
                     if col:
                         weights = filtered_df[col]
                         probs = weights / weights.sum()
@@ -133,7 +135,9 @@ if uploaded_file:
                 if method == "Random":
                     sample_df = filtered_df.sample(n=n)
                 else:
-                    col = auto_detect_monetary_column(filtered_df)
+                    monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
+                    default_col = auto_detect_monetary_column(filtered_df)
+                    col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
                     weights = filtered_df[col]
                     probs = weights / weights.sum()
                     sample_df = filtered_df.sample(n=n, weights=probs)
