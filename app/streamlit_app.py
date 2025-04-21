@@ -1,10 +1,29 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
 from datetime import datetime
 
-st.set_page_config(page_title="Audit Sampling Tool", layout="wide")
+# Page setup with custom icon
+st.set_page_config(page_title="Audit Sampling Tool", layout="wide", page_icon="portfolio.ico")
+
+# Modern theming
+st.markdown("""
+    <style>
+        .main {
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #1a4d8f;
+        }
+        .stButton>button {
+            background-color: #1a4d8f;
+            color: white;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("Audit Sampling Tool")
 
 st.sidebar.header("📁 Upload File")
@@ -77,7 +96,6 @@ if uploaded_file:
                 if selected:
                     filters[col] = df[col].isin(selected)
 
-        # Apply filters
         filtered_df = df
         for key, cond in filters.items():
             filtered_df = filtered_df[cond]
@@ -86,7 +104,6 @@ if uploaded_file:
         st.write(f"{len(filtered_df)} rows after filtering")
         st.dataframe(filtered_df)
 
-        # Step 3: Sampling
         st.subheader("🎲 Select Sampling Method")
         method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
         sample_df = pd.DataFrame()
@@ -144,12 +161,10 @@ if uploaded_file:
                     st.info(f"💰 Using column: '{col}' for weighting")
                 st.success(f"✅ Sample complete: {len(sample_df)} rows")
 
-        # Summary
         if not sample_df.empty:
             st.subheader("📊 Sample Summary")
             st.info(f"Selected {len(sample_df)} items from population of {len(filtered_df)}.")
 
-        # Step 4: Export
         if not sample_df.empty:
             st.subheader("📂 Export Sample + Audit Log")
 
