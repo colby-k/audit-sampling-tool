@@ -139,6 +139,62 @@ if uploaded_file:
         else:
             show_chart(filtered_df)
 
+        # Re-adding population and sample selection logic
+        st.subheader("🎲 Select Sampling Method")
+        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
+        sample_df = pd.DataFrame()
+
+        if method == "Stratified":
+            strat_col = st.selectbox("Stratify by", filtered_df.columns)
+            n_per_group = st.number_input("Samples per group", min_value=1, value=5)
+            if st.button("🔀 Run Stratified Sample"):
+                for group in filtered_df[strat_col].dropna().unique():
+                    group_df = filtered_df[filtered_df[strat_col] == group]
+                    n = min(n_per_group, len(group_df))
+                    sample_df = pd.concat([sample_df, group_df.sample(n=n)])
+                st.success(f"✅ Stratified sample complete: {len(sample_df)} rows")
+
+        elif method == "Statistical (Attribute or Monetary)":
+            sample_type = st.selectbox("Sampling Type", ["Attribute", "Monetary"])
+            confidence_level = st.selectbox("Confidence Level", ["90%", "95%", "99%"])
+            precision = st.number_input("Precision (% Tolerable Deviation)", min_value=0.1, max_value=20.0, value=5.0)
+            expected_error = st.number_input("Expected Error Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
+
+            if st.button("🌿 Run Statistical Sample"):
+                n = calculate_statistical_sample_size(confidence_level, precision, expected_error)
+                n = min(n, len(filtered_df))
+                if sample_type == "Attribute":
+                    sample_df = filtered_df.sample(n=n)
+                else:
+                    monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
+                    default_col = auto_detect_monetary_column(filtered_df)
+                    col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
+                    weights = filtered_df[col]
+                    probs = weights / weights.sum()
+                    sample_df = filtered_df.sample(n=n, weights=probs)
+                    st.info(f"💰 Using column: '{col}' for weighting")
+                st.success(f"✅ Statistical sample complete: {len(sample_df)} rows")
+
+        else:
+            suggested = determine_sample_size(len(filtered_df))
+            n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
+            if st.button("🎯 Run Sample"):
+                if method == "Random":
+                    sample_df = filtered_df.sample(n=n)
+                else:
+                    monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
+                    default_col = auto_detect_monetary_column(filtered_df)
+                    col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
+                    weights = filtered_df[col]
+                    probs = weights / weights.sum()
+                    sample_df = filtered_df.sample(n=n, weights=probs)
+                    st.info(f"💰 Using column: '{col}' for weighting")
+                st.success(f"✅ Sample complete: {len(sample_df)} rows")
+
+        if not sample_df.empty:
+            st.subheader("📊 Sample Summary")
+            st.info(f"Selected {len(sample_df)} items from population of {len(filtered_df)}.")
+
     except Exception as e:
         st.error(f"❌ Failed to load/process file: {e}")
 else:
