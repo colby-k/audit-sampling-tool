@@ -197,6 +197,16 @@ if uploaded_file:
             monetary_col = auto_detect_monetary_column(sample_df)
             sample_df = show_grid(sample_df, monetary_col)
 
+            st.subheader("📥 Download Sample")
+            def export_to_excel(sample_df):
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    sample_df.to_excel(writer, sheet_name="Sample", index=False)
+                return output.getvalue()
+
+            excel_data = export_to_excel(sample_df)
+            st.download_button("📂 Download Sample as Excel", data=excel_data, file_name="audit_sample.xlsx")
+
     except Exception as e:
         st.error(f"❌ Failed to load/process file: {e}")
 else:
