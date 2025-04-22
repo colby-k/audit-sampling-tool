@@ -1,7 +1,6 @@
 streamlit
 pandas
 numpy
-matplotlib
-scipy
-openpyxl
 xlsxwriter
+streamlit-aggrid
+altair
