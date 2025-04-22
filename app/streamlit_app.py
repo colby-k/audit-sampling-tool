@@ -135,9 +135,10 @@ if uploaded_file:
         view_mode = st.radio("View Mode", ["Table", "Chart"], horizontal=True, key="filtered_view")
         if view_mode == "Table":
             monetary_col = auto_detect_monetary_column(filtered_df)
-            filtered_df = show_grid(filtered_df, monetary_col)
+            filtered_df_display = show_grid(filtered_df, monetary_col)
         else:
             show_chart(filtered_df)
+            filtered_df_display = filtered_df
 
         # Re-adding population and sample selection logic
         st.subheader("🎲 Select Sampling Method")
@@ -192,8 +193,9 @@ if uploaded_file:
                 st.success(f"✅ Sample complete: {len(sample_df)} rows")
 
         if not sample_df.empty:
-            st.subheader("📊 Sample Summary")
-            st.info(f"Selected {len(sample_df)} items from population of {len(filtered_df)}.")
+            st.subheader("📊 Sample Output")
+            monetary_col = auto_detect_monetary_column(sample_df)
+            sample_df = show_grid(sample_df, monetary_col)
 
     except Exception as e:
         st.error(f"❌ Failed to load/process file: {e}")
