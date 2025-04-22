@@ -1,4 +1,4 @@
-# Enhanced Audit Sampling Tool with Persistent Flags and Stable AgGrid
+# Enhanced Audit Sampling Tool with Stable AgGrid (Flag Removed)
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -58,12 +58,9 @@ def calculate_statistical_sample_size(confidence_level: str, precision_pct: floa
 
 def show_grid(dataframe, monetary_col, key):
     df_display = dataframe.copy()
-    if "Flag" not in df_display.columns:
-        df_display["Flag"] = False
 
     gb = GridOptionsBuilder.from_dataframe(df_display)
     gb.configure_default_column(editable=True, groupable=True)
-    gb.configure_column("Flag", editable=True, checkbox=True)
 
     if monetary_col:
         gb.configure_column(monetary_col, cellStyle={
@@ -79,7 +76,7 @@ def show_grid(dataframe, monetary_col, key):
     grid_response = AgGrid(
         df_display,
         gridOptions=grid_options,
-        update_mode=GridUpdateMode.MODEL_CHANGED,
+        update_mode=GridUpdateMode.NO_UPDATE,
         fit_columns_on_grid_load=True,
         height=300,
         allow_unsafe_jscode=True,
@@ -205,8 +202,6 @@ if uploaded_file:
             st.subheader("📊 Sample Output")
             monetary_col = auto_detect_monetary_column(sample_df)
             updated_sample_df = show_grid(sample_df, monetary_col, key="sample_grid")
-
-            st.session_state["final_sample"] = updated_sample_df
 
             st.subheader("📥 Download Sample")
             def export_to_excel(df):
