@@ -1,4 +1,4 @@
-# Enhanced Audit Sampling Tool with Stable AgGrid (Flag Removed)
+# Enhanced Audit Sampling Tool with Stable AgGrid and Session State Sampling
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -149,17 +149,17 @@ if uploaded_file:
 
         st.subheader("🎲 Select Sampling Method")
         method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
-        sample_df = pd.DataFrame()
 
         if method == "Stratified":
             strat_col = st.selectbox("Stratify by", filtered_df.columns)
             n_per_group = st.number_input("Samples per group", min_value=1, value=5)
             if st.button("🔀 Run Stratified Sample"):
+                sample_df = pd.DataFrame()
                 for group in filtered_df[strat_col].dropna().unique():
                     group_df = filtered_df[filtered_df[strat_col] == group]
                     n = min(n_per_group, len(group_df))
                     sample_df = pd.concat([sample_df, group_df.sample(n=n)])
-                st.success(f"✅ Stratified sample complete: {len(sample_df)} rows")
+                st.session_state["sample_df"] = sample_df
 
         elif method == "Statistical (Attribute or Monetary)":
             sample_type = st.selectbox("Sampling Type", ["Attribute", "Monetary"])
@@ -180,7 +180,7 @@ if uploaded_file:
                     probs = weights / weights.sum()
                     sample_df = filtered_df.sample(n=n, weights=probs)
                     st.info(f"💰 Using column: '{col}' for weighting")
-                st.success(f"✅ Statistical sample complete: {len(sample_df)} rows")
+                st.session_state["sample_df"] = sample_df
 
         else:
             suggested = determine_sample_size(len(filtered_df))
@@ -196,9 +196,10 @@ if uploaded_file:
                     probs = weights / weights.sum()
                     sample_df = filtered_df.sample(n=n, weights=probs)
                     st.info(f"💰 Using column: '{col}' for weighting")
-                st.success(f"✅ Sample complete: {len(sample_df)} rows")
+                st.session_state["sample_df"] = sample_df
 
-        if not sample_df.empty:
+        if "sample_df" in st.session_state:
+            sample_df = st.session_state["sample_df"]
             st.subheader("📊 Sample Output")
             monetary_col = auto_detect_monetary_column(sample_df)
             updated_sample_df = show_grid(sample_df, monetary_col, key="sample_grid")
