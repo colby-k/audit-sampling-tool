@@ -1,10 +1,10 @@
-# Enhanced Audit Sampling Tool with AgGrid, Conditional Formatting, Row Tagging, and Chart Toggle
+# Enhanced Audit Sampling Tool with AgGrid, Conditional Formatting, Row Tagging, and Chart Toggle (No JsCode)
 import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
 from datetime import datetime
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import altair as alt
 
 st.set_page_config(page_title="Audit Sampling Tool", layout="wide", page_icon="portfolio.ico")
@@ -65,14 +65,14 @@ def show_grid(dataframe, monetary_col):
     gb.configure_column("Flag", editable=True, checkbox=True)
 
     if monetary_col:
-        cell_style_jscode = JsCode("""
-            function(params) {
-                if (params.value >= 10000) {
-                    return { 'color': 'white', 'backgroundColor': '#d9534f' }
+        gb.configure_column(monetary_col, cellStyle={
+            "styleConditions": [
+                {
+                    "condition": "params.value >= 10000",
+                    "style": {"color": "white", "backgroundColor": "#d9534f"}
                 }
-            }
-        """)
-        gb.configure_column(monetary_col, cellStyle=cell_style_jscode)
+            ]
+        })
 
     grid_options = gb.build()
     grid_response = AgGrid(df_display, gridOptions=grid_options, update_mode=GridUpdateMode.MANUAL, fit_columns_on_grid_load=True, height=300)
