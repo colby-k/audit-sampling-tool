@@ -63,16 +63,17 @@ def show_grid(dataframe, monetary_col):
     gb = GridOptionsBuilder.from_dataframe(df_display)
     gb.configure_default_column(editable=True, groupable=True)
     gb.configure_column("Flag", editable=True, checkbox=True)
+
     if monetary_col:
-        cell_style_jscode = JsCode("""
-        function(params) {
-            if (params.value >= params.colDef.highThreshold) {
-                return { 'color': 'white', 'backgroundColor': '#d9534f' }
-            }
-        }
-        """)
         high_threshold = df_display[monetary_col].quantile(0.9)
-        gb.configure_column(monetary_col, cellStyle=cell_style_jscode, highThreshold=high_threshold)
+        cell_style_jscode = JsCode(f"""
+            function(params) {{
+                if (params.value >= {high_threshold}) {{
+                    return {{ 'color': 'white', 'backgroundColor': '#d9534f' }}
+                }}
+            }}
+        """)
+        gb.configure_column(monetary_col, cellStyle=cell_style_jscode)
 
     grid_options = gb.build()
     grid_response = AgGrid(df_display, gridOptions=grid_options, update_mode=GridUpdateMode.MANUAL, fit_columns_on_grid_load=True, height=300)
