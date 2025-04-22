@@ -65,13 +65,12 @@ def show_grid(dataframe, monetary_col):
     gb.configure_column("Flag", editable=True, checkbox=True)
 
     if monetary_col:
-        high_threshold = df_display[monetary_col].quantile(0.9)
-        cell_style_jscode = JsCode(f"""
-            function(params) {{
-                if (params.value >= {high_threshold}) {{
-                    return {{ 'color': 'white', 'backgroundColor': '#d9534f' }}
-                }}
-            }}
+        cell_style_jscode = JsCode("""
+            function(params) {
+                if (params.value >= 10000) {
+                    return { 'color': 'white', 'backgroundColor': '#d9534f' }
+                }
+            }
         """)
         gb.configure_column(monetary_col, cellStyle=cell_style_jscode)
 
@@ -139,87 +138,6 @@ if uploaded_file:
             filtered_df = show_grid(filtered_df, monetary_col)
         else:
             show_chart(filtered_df)
-
-        st.subheader("🎲 Select Sampling Method")
-        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
-        sample_df = pd.DataFrame()
-
-        if method == "Stratified":
-            strat_col = st.selectbox("Stratify by", filtered_df.columns)
-            n_per_group = st.number_input("Samples per group", min_value=1, value=5)
-            if st.button("🔀 Run Stratified Sample"):
-                for group in filtered_df[strat_col].dropna().unique():
-                    group_df = filtered_df[filtered_df[strat_col] == group]
-                    n = min(n_per_group, len(group_df))
-                    sample_df = pd.concat([sample_df, group_df.sample(n=n)])
-                st.success(f"✅ Stratified sample complete: {len(sample_df)} rows")
-
-        elif method == "Statistical (Attribute or Monetary)":
-            sample_type = st.selectbox("Sampling Type", ["Attribute", "Monetary"])
-            confidence_level = st.selectbox("Confidence Level", ["90%", "95%", "99%"])
-            precision = st.number_input("Precision (% Tolerable Deviation)", min_value=0.1, max_value=20.0, value=5.0)
-            expected_error = st.number_input("Expected Error Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
-
-            if st.button("🌿 Run Statistical Sample"):
-                n = calculate_statistical_sample_size(confidence_level, precision, expected_error)
-                n = min(n, len(filtered_df))
-                if sample_type == "Attribute":
-                    sample_df = filtered_df.sample(n=n)
-                else:
-                    monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
-                    default_col = auto_detect_monetary_column(filtered_df)
-                    col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
-                    weights = filtered_df[col]
-                    probs = weights / weights.sum()
-                    sample_df = filtered_df.sample(n=n, weights=probs)
-                    st.info(f"💰 Using column: '{col}' for weighting")
-                st.success(f"✅ Statistical sample complete: {len(sample_df)} rows")
-
-        else:
-            suggested = determine_sample_size(len(filtered_df))
-            n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
-            if st.button("🎯 Run Sample"):
-                if method == "Random":
-                    sample_df = filtered_df.sample(n=n)
-                else:
-                    monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
-                    default_col = auto_detect_monetary_column(filtered_df)
-                    col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
-                    weights = filtered_df[col]
-                    probs = weights / weights.sum()
-                    sample_df = filtered_df.sample(n=n, weights=probs)
-                    st.info(f"💰 Using column: '{col}' for weighting")
-                st.success(f"✅ Sample complete: {len(sample_df)} rows")
-
-        if not sample_df.empty:
-            st.subheader("📊 Sample Summary")
-            st.info(f"Selected {len(sample_df)} items from population of {len(filtered_df)}.")
-
-            st.subheader("📂 Export Sample + Audit Log")
-            def export_to_excel(sample_df, filters):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    sample_df.to_excel(writer, sheet_name="Sample", index=False)
-                    audit_log = {
-                        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "Rows in Population": len(df),
-                        "Rows After Filter": len(filtered_df),
-                        "Sample Size": len(sample_df),
-                        "Filters Applied": str({k: str(v) for k, v in filters.items()})
-                    }
-                    pd.DataFrame.from_dict(audit_log, orient='index').to_excel(writer, sheet_name="AuditLog")
-                return output.getvalue()
-
-            excel_data = export_to_excel(sample_df, filters)
-            st.download_button("📅 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
-
-            st.subheader("🧾 Sample View")
-            sample_view = st.radio("View Sample As", ["Table", "Chart"], horizontal=True, key="sample_view")
-            if sample_view == "Table":
-                monetary_col = auto_detect_monetary_column(sample_df)
-                show_grid(sample_df, monetary_col)
-            else:
-                show_chart(sample_df)
 
     except Exception as e:
         st.error(f"❌ Failed to load/process file: {e}")
