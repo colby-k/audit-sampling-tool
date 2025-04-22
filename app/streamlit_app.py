@@ -1,10 +1,11 @@
-# Enhanced Audit Sampling Tool with AgGrid
+# Enhanced Audit Sampling Tool with AgGrid, Conditional Formatting, Row Tagging, and Chart Toggle
 import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
 from datetime import datetime
-from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+import altair as alt
 
 st.set_page_config(page_title="Audit Sampling Tool", layout="wide", page_icon="portfolio.ico")
 
@@ -55,6 +56,39 @@ def calculate_statistical_sample_size(confidence_level: str, precision_pct: floa
     n = (Z ** 2) * p * (1 - p) / (E ** 2)
     return int(np.ceil(n))
 
+def show_grid(dataframe, monetary_col):
+    df_display = dataframe.copy()
+    df_display["Flag"] = False
+
+    gb = GridOptionsBuilder.from_dataframe(df_display)
+    gb.configure_default_column(editable=True, groupable=True)
+    gb.configure_column("Flag", editable=True, checkbox=True)
+    if monetary_col:
+        cell_style_jscode = JsCode("""
+        function(params) {
+            if (params.value >= params.colDef.highThreshold) {
+                return { 'color': 'white', 'backgroundColor': '#d9534f' }
+            }
+        }
+        """)
+        high_threshold = df_display[monetary_col].quantile(0.9)
+        gb.configure_column(monetary_col, cellStyle=cell_style_jscode, highThreshold=high_threshold)
+
+    grid_options = gb.build()
+    grid_response = AgGrid(df_display, gridOptions=grid_options, update_mode=GridUpdateMode.MANUAL, fit_columns_on_grid_load=True, height=300)
+    return grid_response['data']
+
+def show_chart(dataframe):
+    chart_col = st.selectbox("Select column to summarize", dataframe.select_dtypes(include='object').columns)
+    monetary_col = auto_detect_monetary_column(dataframe)
+    chart_data = dataframe.groupby(chart_col)[monetary_col].sum().reset_index()
+    chart = alt.Chart(chart_data).mark_bar().encode(
+        x=alt.X(chart_col, sort='-y'),
+        y=alt.Y(monetary_col),
+        tooltip=[chart_col, monetary_col]
+    ).properties(width=700, height=300)
+    st.altair_chart(chart)
+
 if uploaded_file:
     try:
         filename = uploaded_file.name
@@ -98,8 +132,12 @@ if uploaded_file:
             filtered_df = filtered_df[cond]
 
         st.subheader("🔎 Filtered Data")
-        st.write(f"{len(filtered_df)} rows after filtering")
-        AgGrid(filtered_df, height=250, fit_columns_on_grid_load=True)
+        view_mode = st.radio("View Mode", ["Table", "Chart"], horizontal=True, key="filtered_view")
+        if view_mode == "Table":
+            monetary_col = auto_detect_monetary_column(filtered_df)
+            filtered_df = show_grid(filtered_df, monetary_col)
+        else:
+            show_chart(filtered_df)
 
         st.subheader("🎲 Select Sampling Method")
         method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
@@ -156,9 +194,7 @@ if uploaded_file:
             st.subheader("📊 Sample Summary")
             st.info(f"Selected {len(sample_df)} items from population of {len(filtered_df)}.")
 
-        if not sample_df.empty:
             st.subheader("📂 Export Sample + Audit Log")
-
             def export_to_excel(sample_df, filters):
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -175,7 +211,14 @@ if uploaded_file:
 
             excel_data = export_to_excel(sample_df, filters)
             st.download_button("📅 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
-            AgGrid(sample_df, height=250, fit_columns_on_grid_load=True)
+
+            st.subheader("🧾 Sample View")
+            sample_view = st.radio("View Sample As", ["Table", "Chart"], horizontal=True, key="sample_view")
+            if sample_view == "Table":
+                monetary_col = auto_detect_monetary_column(sample_df)
+                show_grid(sample_df, monetary_col)
+            else:
+                show_chart(sample_df)
 
     except Exception as e:
         st.error(f"❌ Failed to load/process file: {e}")
