@@ -1,4 +1,4 @@
-# Enhanced Audit Sampling Tool with AgGrid, Conditional Formatting, Row Tagging, and Chart Toggle (No JsCode)
+# Enhanced Audit Sampling Tool with Persistent Flags and Stable AgGrid
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -56,9 +56,10 @@ def calculate_statistical_sample_size(confidence_level: str, precision_pct: floa
     n = (Z ** 2) * p * (1 - p) / (E ** 2)
     return int(np.ceil(n))
 
-def show_grid(dataframe, monetary_col):
+def show_grid(dataframe, monetary_col, key):
     df_display = dataframe.copy()
-    df_display["Flag"] = False
+    if "Flag" not in df_display.columns:
+        df_display["Flag"] = False
 
     gb = GridOptionsBuilder.from_dataframe(df_display)
     gb.configure_default_column(editable=True, groupable=True)
@@ -78,11 +79,11 @@ def show_grid(dataframe, monetary_col):
     grid_response = AgGrid(
         df_display,
         gridOptions=grid_options,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
+        update_mode=GridUpdateMode.MODEL_CHANGED,
         fit_columns_on_grid_load=True,
         height=300,
         allow_unsafe_jscode=True,
-        enable_enterprise_modules=False,
+        key=key,
         reload_data=False
     )
     return grid_response['data']
@@ -144,7 +145,7 @@ if uploaded_file:
         view_mode = st.radio("View Mode", ["Table", "Chart"], horizontal=True, key="filtered_view")
         if view_mode == "Table":
             monetary_col = auto_detect_monetary_column(filtered_df)
-            filtered_df_display = show_grid(filtered_df, monetary_col)
+            filtered_df_display = show_grid(filtered_df, monetary_col, key="filtered_grid")
         else:
             show_chart(filtered_df)
             filtered_df_display = filtered_df
@@ -203,16 +204,18 @@ if uploaded_file:
         if not sample_df.empty:
             st.subheader("📊 Sample Output")
             monetary_col = auto_detect_monetary_column(sample_df)
-            sample_df = show_grid(sample_df, monetary_col)
+            updated_sample_df = show_grid(sample_df, monetary_col, key="sample_grid")
+
+            st.session_state["final_sample"] = updated_sample_df
 
             st.subheader("📥 Download Sample")
-            def export_to_excel(sample_df):
+            def export_to_excel(df):
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    sample_df.to_excel(writer, sheet_name="Sample", index=False)
+                    df.to_excel(writer, sheet_name="Sample", index=False)
                 return output.getvalue()
 
-            excel_data = export_to_excel(sample_df)
+            excel_data = export_to_excel(updated_sample_df)
             st.download_button("📂 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
 
     except Exception as e:
