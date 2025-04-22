@@ -75,7 +75,16 @@ def show_grid(dataframe, monetary_col):
         })
 
     grid_options = gb.build()
-    grid_response = AgGrid(df_display, gridOptions=grid_options, update_mode=GridUpdateMode.MANUAL, fit_columns_on_grid_load=True, height=300)
+    grid_response = AgGrid(
+        df_display,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        fit_columns_on_grid_load=True,
+        height=300,
+        allow_unsafe_jscode=True,
+        enable_enterprise_modules=False,
+        reload_data=False
+    )
     return grid_response['data']
 
 def show_chart(dataframe):
@@ -140,7 +149,6 @@ if uploaded_file:
             show_chart(filtered_df)
             filtered_df_display = filtered_df
 
-        # Re-adding population and sample selection logic
         st.subheader("🎲 Select Sampling Method")
         method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
         sample_df = pd.DataFrame()
