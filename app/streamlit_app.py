@@ -205,7 +205,7 @@ if uploaded_file:
                 return output.getvalue()
 
             excel_data = export_to_excel(sample_df)
-            st.download_button("📂 Download Sample as Excel", data=excel_data, file_name="audit_sample.xlsx")
+            st.download_button("📂 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
 
     except Exception as e:
         st.error(f"❌ Failed to load/process file: {e}")
