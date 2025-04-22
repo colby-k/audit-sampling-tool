@@ -1,14 +1,13 @@
-
+# Enhanced Audit Sampling Tool with AgGrid
 import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
 from datetime import datetime
+from st_aggrid import AgGrid, GridOptionsBuilder
 
-# Page setup with custom icon
 st.set_page_config(page_title="Audit Sampling Tool", layout="wide", page_icon="portfolio.ico")
 
-# Modern theming
 st.markdown("""
     <style>
         .main {
@@ -56,7 +55,6 @@ def calculate_statistical_sample_size(confidence_level: str, precision_pct: floa
     n = (Z ** 2) * p * (1 - p) / (E ** 2)
     return int(np.ceil(n))
 
-# Step 1: Upload + Clean
 if uploaded_file:
     try:
         filename = uploaded_file.name
@@ -71,7 +69,6 @@ if uploaded_file:
 
         st.success(f"✅ Loaded {filename} with {len(df)} rows")
 
-        # Step 2: Filters
         st.sidebar.subheader("🎛️ Filter Data")
         filters = {}
         for col in df.columns:
@@ -102,7 +99,7 @@ if uploaded_file:
 
         st.subheader("🔎 Filtered Data")
         st.write(f"{len(filtered_df)} rows after filtering")
-        st.dataframe(filtered_df)
+        AgGrid(filtered_df, height=250, fit_columns_on_grid_load=True)
 
         st.subheader("🎲 Select Sampling Method")
         method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
@@ -112,7 +109,6 @@ if uploaded_file:
             strat_col = st.selectbox("Stratify by", filtered_df.columns)
             n_per_group = st.number_input("Samples per group", min_value=1, value=5)
             if st.button("🔀 Run Stratified Sample"):
-                sample_df = pd.DataFrame()
                 for group in filtered_df[strat_col].dropna().unique():
                     group_df = filtered_df[filtered_df[strat_col] == group]
                     n = min(n_per_group, len(group_df))
@@ -128,21 +124,16 @@ if uploaded_file:
             if st.button("🌿 Run Statistical Sample"):
                 n = calculate_statistical_sample_size(confidence_level, precision, expected_error)
                 n = min(n, len(filtered_df))
-
                 if sample_type == "Attribute":
                     sample_df = filtered_df.sample(n=n)
                 else:
                     monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
                     default_col = auto_detect_monetary_column(filtered_df)
                     col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
-                    if col:
-                        weights = filtered_df[col]
-                        probs = weights / weights.sum()
-                        sample_df = filtered_df.sample(n=n, weights=probs)
-                        st.info(f"💰 Using column: '{col}' for weighting")
-                    else:
-                        st.warning("⚠️ No monetary column detected. Defaulting to random sampling.")
-                        sample_df = filtered_df.sample(n=n)
+                    weights = filtered_df[col]
+                    probs = weights / weights.sum()
+                    sample_df = filtered_df.sample(n=n, weights=probs)
+                    st.info(f"💰 Using column: '{col}' for weighting")
                 st.success(f"✅ Statistical sample complete: {len(sample_df)} rows")
 
         else:
@@ -184,7 +175,7 @@ if uploaded_file:
 
             excel_data = export_to_excel(sample_df, filters)
             st.download_button("📅 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
-            st.dataframe(sample_df)
+            AgGrid(sample_df, height=250, fit_columns_on_grid_load=True)
 
     except Exception as e:
         st.error(f"❌ Failed to load/process file: {e}")
