@@ -96,27 +96,25 @@ def show_chart(dataframe):
     ).properties(width=700, height=300)
     st.altair_chart(chart)
 
-# Remaining app code is unchanged until sample_df section
+# Display sampled data and summary if available
+if "sample_df" in st.session_state:
+    sample_df = st.session_state["sample_df"]
+    st.subheader("📊 Sample Output")
+    monetary_col = auto_detect_monetary_column(sample_df)
+    updated_sample_df = show_grid(sample_df, monetary_col, key="sample_grid")
 
-        if "sample_df" in st.session_state:
-            sample_df = st.session_state["sample_df"]
-            st.subheader("📊 Sample Output")
-            monetary_col = auto_detect_monetary_column(sample_df)
-            updated_sample_df = show_grid(sample_df, monetary_col, key="sample_grid")
+    st.subheader("📈 Sample Summary")
+    st.info(f"Selected {len(updated_sample_df)} records from population of {len(filtered_df)} after filtering.")
+    if monetary_col in updated_sample_df.columns:
+        st.write(f"**Total {monetary_col}:** {updated_sample_df[monetary_col].sum():,.2f}")
+        st.write(f"**Average {monetary_col}:** {updated_sample_df[monetary_col].mean():,.2f}")
 
-            # Summary Section
-            st.subheader("📈 Sample Summary")
-            st.info(f"Selected {len(updated_sample_df)} records from population of {len(filtered_df)} after filtering.")
-            if monetary_col in updated_sample_df.columns:
-                st.write(f"**Total {monetary_col}:** {updated_sample_df[monetary_col].sum():,.2f}")
-                st.write(f"**Average {monetary_col}:** {updated_sample_df[monetary_col].mean():,.2f}")
+    st.subheader("📥 Download Sample")
+    def export_to_excel(df):
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name="Sample", index=False)
+        return output.getvalue()
 
-            st.subheader("📥 Download Sample")
-            def export_to_excel(df):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, sheet_name="Sample", index=False)
-                return output.getvalue()
-
-            excel_data = export_to_excel(updated_sample_df)
-            st.download_button("📂 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
+    excel_data = export_to_excel(updated_sample_df)
+    st.download_button("📂 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
