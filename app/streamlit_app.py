@@ -1,4 +1,4 @@
-# Audit Sampling Tool with Persistent Sampling UI and Re-Runnable Options
+# Audit Sampling Tool with Consolidated Monetary Sampling
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -147,7 +147,7 @@ if uploaded_file:
             filtered_df_display = filtered_df
 
         st.subheader("🎲 Select Sampling Method")
-        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"], key="method")
+        method = st.radio("Method", ["Random", "Stratified", "Statistical (Attribute or Monetary)"], key="method")
 
         sample_df = pd.DataFrame()
 
@@ -183,14 +183,8 @@ if uploaded_file:
                     probs = weights / weights.sum()
                     sample_df = filtered_df.sample(n=n, weights=probs)
 
-            else:
-                if method == "Random":
-                    sample_df = filtered_df.sample(n=n)
-                else:
-                    col = auto_detect_monetary_column(filtered_df)
-                    weights = filtered_df[col]
-                    probs = weights / weights.sum()
-                    sample_df = filtered_df.sample(n=n, weights=probs)
+            else:  # Random
+                sample_df = filtered_df.sample(n=n)
 
             st.session_state["sample_df"] = sample_df
 
