@@ -1,4 +1,4 @@
-# Enhanced Audit Sampling Tool with Sample Summary and Improved Date Filtering
+# Enhanced Audit Sampling Tool with Controlled Execution Flow and Improved Filters
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -148,11 +148,12 @@ if uploaded_file:
 
         st.subheader("🎲 Select Sampling Method")
         method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
+        run_sampling = st.button("🎯 Run Sample")
 
-        if method == "Stratified":
-            strat_col = st.selectbox("Stratify by", filtered_df.columns)
-            n_per_group = st.number_input("Samples per group", min_value=1, value=5)
-            if st.button("🔀 Run Stratified Sample"):
+        if run_sampling:
+            if method == "Stratified":
+                strat_col = st.selectbox("Stratify by", filtered_df.columns)
+                n_per_group = st.number_input("Samples per group", min_value=1, value=5)
                 sample_df = pd.DataFrame()
                 for group in filtered_df[strat_col].dropna().unique():
                     group_df = filtered_df[filtered_df[strat_col] == group]
@@ -160,13 +161,11 @@ if uploaded_file:
                     sample_df = pd.concat([sample_df, group_df.sample(n=n)])
                 st.session_state["sample_df"] = sample_df
 
-        elif method == "Statistical (Attribute or Monetary)":
-            sample_type = st.selectbox("Sampling Type", ["Attribute", "Monetary"])
-            confidence_level = st.selectbox("Confidence Level", ["90%", "95%", "99%"])
-            precision = st.number_input("Precision (% Tolerable Deviation)", min_value=0.1, max_value=20.0, value=5.0)
-            expected_error = st.number_input("Expected Error Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
-
-            if st.button("🌿 Run Statistical Sample"):
+            elif method == "Statistical (Attribute or Monetary)":
+                sample_type = st.selectbox("Sampling Type", ["Attribute", "Monetary"])
+                confidence_level = st.selectbox("Confidence Level", ["90%", "95%", "99%"])
+                precision = st.number_input("Precision (% Tolerable Deviation)", min_value=0.1, max_value=20.0, value=5.0)
+                expected_error = st.number_input("Expected Error Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
                 n = calculate_statistical_sample_size(confidence_level, precision, expected_error)
                 n = min(n, len(filtered_df))
                 if sample_type == "Attribute":
@@ -181,10 +180,9 @@ if uploaded_file:
                     st.info(f"💰 Using column: '{col}' for weighting")
                 st.session_state["sample_df"] = sample_df
 
-        else:
-            suggested = determine_sample_size(len(filtered_df))
-            n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
-            if st.button("🎯 Run Sample"):
+            else:  # Random or Monetary Unit Sampling
+                suggested = determine_sample_size(len(filtered_df))
+                n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
                 if method == "Random":
                     sample_df = filtered_df.sample(n=n)
                 else:
