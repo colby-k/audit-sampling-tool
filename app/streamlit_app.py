@@ -1,4 +1,4 @@
-# Enhanced Audit Sampling Tool with Persistent Sampling UI
+# Audit Sampling Tool with Persistent Sampling UI and Re-Runnable Options
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -147,57 +147,50 @@ if uploaded_file:
             filtered_df_display = filtered_df
 
         st.subheader("🎲 Select Sampling Method")
-        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"])
+        method = st.radio("Method", ["Random", "Monetary Unit Sampling", "Stratified", "Statistical (Attribute or Monetary)"], key="method")
 
-        if "sampling_started" not in st.session_state:
-            st.session_state["sampling_started"] = False
+        sample_df = pd.DataFrame()
 
-        if not st.session_state["sampling_started"]:
-            if st.button("🎯 Run Sample"):
-                st.session_state["sampling_started"] = True
+        if method == "Stratified":
+            strat_col = st.selectbox("Stratify by", filtered_df.columns, key="strat_col")
+            n_per_group = st.number_input("Samples per group", min_value=1, value=5, key="strat_n")
 
-        if st.session_state["sampling_started"]:
-            sample_df = pd.DataFrame()
+        elif method == "Statistical (Attribute or Monetary)":
+            sample_type = st.selectbox("Sampling Type", ["Attribute", "Monetary"], key="sample_type")
+            confidence_level = st.selectbox("Confidence Level", ["90%", "95%", "99%"], key="conf_lvl")
+            precision = st.number_input("Precision (% Tolerable Deviation)", min_value=0.1, max_value=20.0, value=5.0, key="prec")
+            expected_error = st.number_input("Expected Error Rate (%)", min_value=0.0, max_value=100.0, value=5.0, key="exp_err")
+            n = calculate_statistical_sample_size(confidence_level, precision, expected_error)
 
+        else:
+            suggested = determine_sample_size(len(filtered_df))
+            n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested, key="basic_n")
+
+        if st.button("📌 Generate Sample"):
             if method == "Stratified":
-                strat_col = st.selectbox("Stratify by", filtered_df.columns)
-                n_per_group = st.number_input("Samples per group", min_value=1, value=5)
                 for group in filtered_df[strat_col].dropna().unique():
                     group_df = filtered_df[filtered_df[strat_col] == group]
-                    n = min(n_per_group, len(group_df))
-                    sample_df = pd.concat([sample_df, group_df.sample(n=n)])
+                    n_group = min(n_per_group, len(group_df))
+                    sample_df = pd.concat([sample_df, group_df.sample(n=n_group)])
 
             elif method == "Statistical (Attribute or Monetary)":
-                sample_type = st.selectbox("Sampling Type", ["Attribute", "Monetary"])
-                confidence_level = st.selectbox("Confidence Level", ["90%", "95%", "99%"])
-                precision = st.number_input("Precision (% Tolerable Deviation)", min_value=0.1, max_value=20.0, value=5.0)
-                expected_error = st.number_input("Expected Error Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
-                n = calculate_statistical_sample_size(confidence_level, precision, expected_error)
                 n = min(n, len(filtered_df))
                 if sample_type == "Attribute":
                     sample_df = filtered_df.sample(n=n)
                 else:
-                    monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
-                    default_col = auto_detect_monetary_column(filtered_df)
-                    col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
+                    col = auto_detect_monetary_column(filtered_df)
                     weights = filtered_df[col]
                     probs = weights / weights.sum()
                     sample_df = filtered_df.sample(n=n, weights=probs)
-                    st.info(f"💰 Using column: '{col}' for weighting")
 
-            else:  # Random or Monetary Unit Sampling
-                suggested = determine_sample_size(len(filtered_df))
-                n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested)
+            else:
                 if method == "Random":
                     sample_df = filtered_df.sample(n=n)
                 else:
-                    monetary_cols = filtered_df.select_dtypes(include='number').columns.tolist()
-                    default_col = auto_detect_monetary_column(filtered_df)
-                    col = st.selectbox("Select monetary column to use", monetary_cols, index=monetary_cols.index(default_col) if default_col in monetary_cols else 0)
+                    col = auto_detect_monetary_column(filtered_df)
                     weights = filtered_df[col]
                     probs = weights / weights.sum()
                     sample_df = filtered_df.sample(n=n, weights=probs)
-                    st.info(f"💰 Using column: '{col}' for weighting")
 
             st.session_state["sample_df"] = sample_df
 
