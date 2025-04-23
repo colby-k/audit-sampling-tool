@@ -126,27 +126,4 @@ if uploaded_file:
                 if use_filter:
                     start_date = st.sidebar.date_input(f"Start {col}", value=min_date, min_value=min_date, max_value=max_date)
                     end_date = st.sidebar.date_input(f"End {col}", value=max_date, min_value=min_date, max_value=max_date)
-                    filters[col] = df[col].between(pd.to_datetime(start_date), pd.to_datetime(end_date))
-            else:
-                unique = df[col].dropna().unique().tolist()
-                selected = st.sidebar.multiselect(f"{col}", unique)
-                if selected:
-                    filters[col] = df[col].isin(selected)
-
-        filtered_df = df.copy()
-        for key, cond in filters.items():
-            filtered_df = filtered_df[cond]
-
-        st.subheader("🔎 Filtered Data")
-        view_mode = st.radio("View Mode", ["Table", "Chart"], horizontal=True, key="filtered_view")
-        if view_mode == "Table":
-            monetary_col = auto_detect_monetary_column(filtered_df)
-            filtered_df_display = show_grid(filtered_df, monetary_col, key="filtered_grid")
-        else:
-            show_chart(filtered_df)
-            filtered_df_display = filtered_df
-
-    except Exception as e:
-        st.error(f"❌ Failed to load/process file: {e}")
-else:
-    st.info("📂 Upload a CSV or Excel file to begin.")
+                    filters[col] = df[col]
