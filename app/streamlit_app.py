@@ -277,3 +277,12 @@ if uploaded_file:
         st.error(f"❌ Failed to load/process file: {e}")
 else:
     st.info("📂 Upload a CSV or Excel file to begin.")
+
+# ---------------- Footer ----------------
+st.markdown(
+    """
+    ---
+    🔗 [Visit my Internal Audit & Analytics Portfolio on GitHub](https://github.com/colby-k)
+    """,
+    unsafe_allow_html=True
+)
