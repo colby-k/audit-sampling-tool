@@ -28,9 +28,10 @@ st.title("Audit Sampling Tool")
 
 st.sidebar.header("📁 Upload File")
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
+
 # Sidebar portfolio link
 st.sidebar.markdown(
-    "[🌐 Visit my Internal Audit & Analytics Portfolio](https://colby-k.github.io/)"
+    "[📊 Visit my Internal Audit & Analytics Portfolio](https://colby-k.github.io/)"
 )
 
 # ---------------- Utilities ----------------
