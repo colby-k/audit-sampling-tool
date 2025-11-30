@@ -1,4 +1,4 @@
-# Audit Sampling Tool with Consolidated Monetary Sampling
+# Audit Sampling Tool with Consolidated Monetary Sampling + Control Testing
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -29,7 +29,7 @@ st.title("Audit Sampling Tool")
 st.sidebar.header("📁 Upload File")
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
 
-# Utilities
+# ---------------- Utilities ----------------
 def auto_detect_monetary_column(df):
     numeric_cols = df.select_dtypes(include='number').columns.tolist()
     keywords = ['amount', 'total', 'value', 'payment', 'invoice', 'price', 'cost', 'fee']
@@ -55,6 +55,17 @@ def calculate_statistical_sample_size(confidence_level: str, precision_pct: floa
     E = precision_pct / 100.0
     n = (Z ** 2) * p * (1 - p) / (E ** 2)
     return int(np.ceil(n))
+
+def control_testing_sample_size(frequency: str) -> int:
+    guidance = {
+        "Annual": 1,
+        "Quarterly": 2,
+        "Monthly": 5,  # could be 2–5, simplified here
+        "Weekly": 5,
+        "Daily": 20,
+        "Multiple times per day": 25
+    }
+    return guidance.get(frequency, 5)
 
 def show_grid(dataframe, monetary_col, key):
     df_display = dataframe.copy()
@@ -93,6 +104,7 @@ def show_chart(dataframe):
     ).properties(width=700, height=300)
     st.altair_chart(chart)
 
+# ---------------- Main Logic ----------------
 if uploaded_file:
     try:
         filename = uploaded_file.name
@@ -107,6 +119,7 @@ if uploaded_file:
 
         st.success(f"✅ Loaded {filename} with {len(df)} rows")
 
+        # Sidebar filters
         st.sidebar.subheader("🎛️ Filter Data")
         filters = {}
         for col in df.columns:
@@ -146,8 +159,14 @@ if uploaded_file:
             show_chart(filtered_df)
             filtered_df_display = filtered_df
 
+        # Sampling methods
         st.subheader("🎲 Select Sampling Method")
-        method = st.radio("Method", ["Random", "Stratified", "Statistical (Attribute or Monetary)"], key="method")
+        method = st.radio("Method", [
+            "Random",
+            "Stratified",
+            "Statistical (Attribute or Monetary)",
+            "Control Testing (Frequency-Based)"
+        ], key="method")
 
         sample_df = pd.DataFrame()
 
@@ -162,10 +181,18 @@ if uploaded_file:
             expected_error = st.number_input("Expected Error Rate (%)", min_value=0.0, max_value=100.0, value=5.0, key="exp_err")
             n = calculate_statistical_sample_size(confidence_level, precision, expected_error)
 
-        else:
+        elif method == "Control Testing (Frequency-Based)":
+            frequency = st.selectbox("Control Frequency", [
+                "Annual", "Quarterly", "Monthly", "Weekly", "Daily", "Multiple times per day"
+            ], key="control_freq")
+            n = control_testing_sample_size(frequency)
+            st.info(f"Recommended sample size for **{frequency}** control: **{n}**")
+
+        else:  # Random
             suggested = determine_sample_size(len(filtered_df))
             n = st.number_input("Sample size", min_value=1, max_value=len(filtered_df), value=suggested, key="basic_n")
 
+        # Generate sample
         if st.button("📌 Generate Sample"):
             if method == "Stratified":
                 for group in filtered_df[strat_col].dropna().unique():
@@ -181,36 +208,4 @@ if uploaded_file:
                     col = auto_detect_monetary_column(filtered_df)
                     weights = filtered_df[col]
                     probs = weights / weights.sum()
-                    sample_df = filtered_df.sample(n=n, weights=probs)
-
-            else:  # Random
-                sample_df = filtered_df.sample(n=n)
-
-            st.session_state["sample_df"] = sample_df
-
-        if "sample_df" in st.session_state:
-            sample_df = st.session_state["sample_df"]
-            st.subheader("📊 Sample Output")
-            monetary_col = auto_detect_monetary_column(sample_df)
-            updated_sample_df = show_grid(sample_df, monetary_col, key="sample_grid")
-
-            st.subheader("📈 Sample Summary")
-            st.info(f"Selected {len(updated_sample_df)} records from population of {len(filtered_df)} after filtering.")
-            if monetary_col in updated_sample_df.columns:
-                st.write(f"**Total {monetary_col}:** {updated_sample_df[monetary_col].sum():,.2f}")
-                st.write(f"**Average {monetary_col}:** {updated_sample_df[monetary_col].mean():,.2f}")
-
-            st.subheader("📥 Download Sample")
-            def export_to_excel(df):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, sheet_name="Sample", index=False)
-                return output.getvalue()
-
-            excel_data = export_to_excel(updated_sample_df)
-            st.download_button("📂 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
-
-    except Exception as e:
-        st.error(f"❌ Failed to load/process file: {e}")
-else:
-    st.info("📂 Upload a CSV or Excel file to begin.")
+                    sample_df = filtered_df.sample(n=n, weights
