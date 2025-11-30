@@ -71,7 +71,7 @@ def show_grid(dataframe, monetary_col, key):
     df_display = dataframe.copy()
     gb = GridOptionsBuilder.from_dataframe(df_display)
     gb.configure_default_column(editable=True, groupable=True)
-    if monetary_col:
+    if monetary_col and monetary_col in df_display.columns:
         gb.configure_column(monetary_col, cellStyle={
             "styleConditions": [
                 {
@@ -94,8 +94,15 @@ def show_grid(dataframe, monetary_col, key):
     return grid_response['data']
 
 def show_chart(dataframe):
-    chart_col = st.selectbox("Select column to summarize", dataframe.select_dtypes(include='object').columns)
+    object_cols = dataframe.select_dtypes(include='object').columns
+    if len(object_cols) == 0:
+        st.info("No categorical columns available to summarize.")
+        return
+    chart_col = st.selectbox("Select column to summarize", object_cols)
     monetary_col = auto_detect_monetary_column(dataframe)
+    if not monetary_col:
+        st.info("No monetary column detected for chart aggregation.")
+        return
     chart_data = dataframe.groupby(chart_col)[monetary_col].sum().reset_index()
     chart = alt.Chart(chart_data).mark_bar().encode(
         x=alt.X(chart_col, sort='-y'),
@@ -114,8 +121,21 @@ if uploaded_file:
             df = pd.read_excel(uploaded_file)
 
         df = df.copy()
+
+        # Normalize object/categorical columns
         for col in df.select_dtypes(include='object').columns:
             df[col] = df[col].astype(str).str.strip().str.title()
+
+        # Attempt to convert obvious date-like columns
+        for col in df.columns:
+            if df[col].dtype == object:
+                try:
+                    parsed = pd.to_datetime(df[col], errors='raise', infer_datetime_format=True)
+                    # If parsing succeeds for many values, keep it
+                    if parsed.notna().sum() > 0.6 * len(parsed):
+                        df[col] = parsed
+                except Exception:
+                    pass
 
         st.success(f"✅ Loaded {filename} with {len(df)} rows")
 
@@ -125,6 +145,7 @@ if uploaded_file:
         for col in df.columns:
             if df[col].dropna().empty:
                 continue
+
             if np.issubdtype(df[col].dtype, np.number):
                 min_val, max_val = float(df[col].min()), float(df[col].max())
                 if min_val == max_val:
@@ -133,6 +154,7 @@ if uploaded_file:
                 else:
                     selected_range = st.sidebar.slider(f"{col} range", min_val, max_val, (min_val, max_val))
                     filters[col] = df[col].between(*selected_range)
+
             elif np.issubdtype(df[col].dtype, np.datetime64):
                 min_date, max_date = df[col].min(), df[col].max()
                 use_filter = st.sidebar.checkbox(f"Filter {col} by date range?", value=False)
@@ -140,6 +162,7 @@ if uploaded_file:
                     start_date = st.sidebar.date_input(f"Start {col}", value=min_date, min_value=min_date, max_value=max_date)
                     end_date = st.sidebar.date_input(f"End {col}", value=max_date, min_value=min_date, max_value=max_date)
                     filters[col] = df[col].between(pd.to_datetime(start_date), pd.to_datetime(end_date))
+
             else:
                 unique = df[col].dropna().unique().tolist()
                 selected = st.sidebar.multiselect(f"{col}", unique)
@@ -203,9 +226,54 @@ if uploaded_file:
             elif method == "Statistical (Attribute or Monetary)":
                 n = min(n, len(filtered_df))
                 if sample_type == "Attribute":
-                    sample_df = filtered_df.sample(n=n)
+                    sample_df = filtered_df.sample(n=n, random_state=42)
                 else:
                     col = auto_detect_monetary_column(filtered_df)
-                    weights = filtered_df[col]
-                    probs = weights / weights.sum()
-                    sample_df = filtered_df.sample(n=n, weights
+                    if col is None:
+                        st.error("No monetary column detected for weighted sampling.")
+                    else:
+                        weights = filtered_df[col].astype(float)
+                        # Guard against non-positive sums
+                        if weights.sum() <= 0:
+                            st.error("Non-positive total monetary value; cannot perform weighted sampling.")
+                        else:
+                            probs = weights / weights.sum()
+                            sample_df = filtered_df.sample(n=n, weights=probs, random_state=42)
+
+            elif method == "Control Testing (Frequency-Based)":
+                n = min(n, len(filtered_df))
+                sample_df = filtered_df.sample(n=n, random_state=42)
+
+            else:  # Random
+                n = min(n, len(filtered_df))
+                sample_df = filtered_df.sample(n=n, random_state=42)
+
+            st.session_state["sample_df"] = sample_df
+
+        # Display sample and export
+        if "sample_df" in st.session_state:
+            sample_df = st.session_state["sample_df"]
+            st.subheader("📊 Sample Output")
+            monetary_col = auto_detect_monetary_column(sample_df)
+            updated_sample_df = show_grid(sample_df, monetary_col, key="sample_grid")
+
+            st.subheader("📈 Sample Summary")
+            st.info(f"Selected {len(updated_sample_df)} records from population of {len(filtered_df)} after filtering.")
+            if monetary_col and monetary_col in updated_sample_df.columns:
+                st.write(f"**Total {monetary_col}:** {updated_sample_df[monetary_col].sum():,.2f}")
+                st.write(f"**Average {monetary_col}:** {updated_sample_df[monetary_col].mean():,.2f}")
+
+            st.subheader("📥 Download Sample")
+            def export_to_excel(df_to_export):
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df_to_export.to_excel(writer, sheet_name="Sample", index=False)
+                return output.getvalue()
+
+            excel_data = export_to_excel(pd.DataFrame(updated_sample_df))
+            st.download_button("📂 Download Sample File", data=excel_data, file_name="audit_sample.xlsx")
+
+    except Exception as e:
+        st.error(f"❌ Failed to load/process file: {e}")
+else:
+    st.info("📂 Upload a CSV or Excel file to begin.")
