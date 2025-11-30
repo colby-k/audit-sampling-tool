@@ -28,6 +28,10 @@ st.title("Audit Sampling Tool")
 
 st.sidebar.header("📁 Upload File")
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
+# Sidebar portfolio link
+st.sidebar.markdown(
+    "[🌐 Visit my Internal Audit & Analytics Portfolio](https://colby-k.github.io/)"
+)
 
 # ---------------- Utilities ----------------
 def auto_detect_monetary_column(df):
@@ -277,17 +281,3 @@ if uploaded_file:
         st.error(f"❌ Failed to load/process file: {e}")
 else:
     st.info("📂 Upload a CSV or Excel file to begin.")
-
-# ---------------- Footer ----------------
-st.markdown(
-    """
-    <div style="text-align:center; margin-top:30px;">
-        <a href="https://colby-k.github.io/" target="_blank">
-            <button style="background-color:#1a4d8f;color:white;padding:10px 20px;border:none;border-radius:5px;">
-                🌐 Internal Audit & Analytics Portfolio
-            </button>
-        </a>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
