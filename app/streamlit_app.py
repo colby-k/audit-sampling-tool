@@ -281,8 +281,13 @@ else:
 # ---------------- Footer ----------------
 st.markdown(
     """
-    ---
-    🔗 [Visit my Internal Audit & Analytics Portfolio on GitHub](https://github.com/colby-k)
+    <div style="text-align:center; margin-top:30px;">
+        <a href="https://colby-k.github.io/" target="_blank">
+            <button style="background-color:#1a4d8f;color:white;padding:10px 20px;border:none;border-radius:5px;">
+                🌐 Internal Audit & Analytics Portfolio
+            </button>
+        </a>
+    </div>
     """,
     unsafe_allow_html=True
 )
