@@ -4,3 +4,4 @@ numpy
 xlsxwriter
 streamlit-aggrid
 altair
+openpyxl
